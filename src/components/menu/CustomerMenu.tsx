@@ -360,24 +360,20 @@ export const CustomerMenu: React.FC = () => {
     const sachesText = desejaSaches ? 'Enviar sachês' : 'Sem sachês 🌱';
     const guardanaposText = desejaGuardanapos ? 'Com guardanapos' : 'Sem guardanapos';
 
-    // Configurações e geração oficial do código Pix Nubank
-    const pixNubankCfg = menuSettings.pixNubank || {
-      chavePix: 'administracao@sabore.pvh.br',
+    // Configurações e geração oficial do código Pix Mercado Pago
+    const pixMP = menuSettings.pixMercadoPago || {
+      accessToken: 'TEST-ACCESS-TOKEN-EXAMPLE',
       nomeTitular: 'TAVERNA BURGER',
-      cidadeTitular: 'PORTO VELHO',
-      instituicao: 'Nu Pagamentos S.A. (Nubank - 260)'
+      instituicao: 'Mercado Pago'
     };
 
-    const pixKey = pixNubankCfg.chavePix || 'administracao@sabore.pvh.br';
-    const pixTitular = pixNubankCfg.nomeTitular || 'TAVERNA BURGER';
-    const pixCidade = pixNubankCfg.cidadeTitular || 'PORTO VELHO';
     const pixTxid = `PED${orderId.replace(/[^a-zA-Z0-9]/g, '')}`.slice(0, 25);
 
     // Geração rigorosa no padrão BR Code do Banco Central com CRC16-CCITT dinâmico e TLV exato
     const officialPixCode = generatePixPayload({
-      chavePix: pixKey,
-      nomeTitular: pixTitular,
-      cidadeTitular: pixCidade,
+      chavePix: 'FIXME_MERCADO_PAGO_PIX_KEY', // Necessário integração API Mercado Pago para dinâmico
+      nomeTitular: pixMP.nomeTitular || 'TAVERNA BURGER',
+      cidadeTitular: 'PORTO VELHO',
       valor: cartTotal,
       txid: pixTxid,
       descricao: `Pedido #${orderId}`
@@ -455,10 +451,10 @@ export const CustomerMenu: React.FC = () => {
       desconto: discountAmount,
       itensCount: totalCartItemsCount,
       pixCode: officialPixCode,
-      pixKey: pixKey,
+      pixKey: pixMP.accessToken || 'API_MERCADO_PAGO',
       txid: pixTxid,
-      nomeTitular: pixTitular,
-      instituicao: pixNubankCfg.instituicao || 'Nu Pagamentos S.A. (Nubank - 260)',
+      nomeTitular: pixMP.nomeTitular || 'TAVERNA BURGER',
+      instituicao: pixMP.instituicao || 'Mercado Pago',
       descartaveisMsg: `${sachesText} • ${guardanaposText}`
     });
 
@@ -477,7 +473,7 @@ export const CustomerMenu: React.FC = () => {
       `📱 *Telefone:* ${clienteTelefone || 'N/A'}\n` +
       `📍 *Modalidade:* ${tipoAtendimento.toUpperCase()} (${tipoAtendimento === 'delivery' ? enderecoEntrega : tipoAtendimento === 'takeaway' ? 'Retirada no Balcão' : numeroMesa})\n` +
       `🥫 *Descartáveis:* ${orderConfirmation.descartaveisMsg}\n` +
-      `💳 *Pagamento:* ${formaPagamento === 'pix' ? 'PIX (NUBANK - Banco 260)' : formaPagamento.toUpperCase()}${trocoPara ? ` (Troco p/ R$ ${trocoPara})` : ''}\n` +
+      `💳 *Pagamento:* ${formaPagamento === 'pix' ? 'PIX (MERCADO PAGO)' : formaPagamento.toUpperCase()}${trocoPara ? ` (Troco p/ R$ ${trocoPara})` : ''}\n` +
       `💰 *Total a Pagar:* R$ ${orderConfirmation.total.toFixed(2)}\n\n` +
       `⚔️ Pedido enviado diretamente pelo Cardápio Digital da Taverna!`
     );
@@ -1356,7 +1352,7 @@ export const CustomerMenu: React.FC = () => {
                 </label>
                 <div className="grid grid-cols-3 gap-2">
                   {[
-                    { id: 'pix' as const, label: '💠 Pix (Instantâneo)' },
+                    { id: 'pix' as const, label: '💠 Pix (Mercado Pago)' },
                     { id: 'cartao_entrega' as const, label: '💳 Cartão' },
                     { id: 'dinheiro' as const, label: '💵 Dinheiro' }
                   ].map(pag => (

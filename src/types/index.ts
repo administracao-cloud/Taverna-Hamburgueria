@@ -95,17 +95,12 @@ export interface AdicionalConfig {
   categoriaAplicavel?: 'burgers' | 'todos' | 'porcoes';
 }
 
-export interface PixNubankConfig {
+export interface PixMercadoPagoConfig {
   habilitado: boolean;
-  chavePix: string;
-  tipoChave: 'cnpj' | 'cpf' | 'email' | 'telefone' | 'aleatoria';
-  nomeTitular: string; // Ex: "TAVERNA BURGER" (max 25 chars)
-  cidadeTitular: string; // Ex: "PORTO VELHO" (max 15 chars)
-  instituicao: string; // Ex: "Nu Pagamentos S.A. (Nubank - 260)"
-  modoIntegracao: 'pix_estatico' | 'nupay_api';
-  nubankClientId?: string;
-  nubankToken?: string;
-  verificacaoAutomatica: boolean;
+  accessToken: string; // Mercado Pago Access Token
+  publicKey: string;   // Mercado Pago Public Key
+  nomeTitular: string; 
+  instituicao: string; // Ex: "Mercado Pago"
   tempoExpiracaoMinutos: number; // default: 15
 }
 
@@ -132,8 +127,8 @@ export interface DigitalMenuSettings {
   habilitarAdicionais: boolean;
   adicionais: AdicionalConfig[];
 
-  // Configuração Oficial Pix / Nubank
-  pixNubank?: PixNubankConfig;
+  // Configuração Oficial Pix / Mercado Pago
+  pixMercadoPago?: PixMercadoPagoConfig;
 }
 
 export interface OrdemChapa {

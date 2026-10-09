@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { useBurger, recipeCategories } from '../../context/BakeryContext';
-import { AdicionalConfig, DigitalMenuSettings, FichaTecnica, RecipeCategory, PixNubankConfig } from '../../types';
+import { AdicionalConfig, DigitalMenuSettings, FichaTecnica, RecipeCategory, PixMercadoPagoConfig } from '../../types';
 import { ItemManagementPanel } from './ItemManagementPanel';
 import { QRCodeSVG } from 'qrcode.react';
 import { 
@@ -80,6 +80,42 @@ export const MenuSettingsPanel: React.FC = () => {
   const [testNubankLog, setTestNubankLog] = useState<{ status: string; e2eId: string; authCode: string; time: string } | null>(null);
   const [isSimulatingNubank, setIsSimulatingNubank] = useState(false);
   const [testPixCopied, setTestPixCopied] = useState(false);
+  const [isVerifyingMp, setIsVerifyingMp] = useState(false);
+  const [mpValidationResult, setMpValidationResult] = useState<{ success: boolean; message: string; mode?: string; user?: any } | null>(null);
+
+  const handleVerifyMercadoPagoApi = async () => {
+    setIsVerifyingMp(true);
+    setMpValidationResult(null);
+    try {
+      const res = await fetch('/api/mercadopago/validate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ accessToken: currentPix.accessToken })
+      });
+      const data = await res.json();
+      if (data.success) {
+        setMpValidationResult({
+          success: true,
+          message: `Conexão validada com sucesso! Conta: ${data.user?.nickname || 'Ativa'}`,
+          mode: data.mode,
+          user: data.user
+        });
+        showFeedback('API do Mercado Pago validada com sucesso!');
+      } else {
+        setMpValidationResult({
+          success: false,
+          message: data.error || 'Falha ao validar credenciais.'
+        });
+      }
+    } catch (err: any) {
+      setMpValidationResult({
+        success: false,
+        message: err.message || 'Erro de conexão com o servidor.'
+      });
+    } finally {
+      setIsVerifyingMp(false);
+    }
+  };
 
   // Confirmation Modal state for safe resets
   const [confirmDialog, setConfirmDialog] = useState<{
@@ -103,40 +139,35 @@ export const MenuSettingsPanel: React.FC = () => {
     setTimeout(() => setSaveToast(null), 2500);
   };
 
-  const currentPix = useMemo((): PixNubankConfig => {
-    return menuSettings.pixNubank || {
+  const currentPix = useMemo((): PixMercadoPagoConfig => {
+    return menuSettings.pixMercadoPago || {
       habilitado: true,
-      chavePix: 'administracao@sabore.pvh.br',
-      tipoChave: 'email',
+      accessToken: 'TEST-ACCESS-TOKEN-EXAMPLE',
+      publicKey: 'TEST-PUBLIC-KEY-EXAMPLE',
       nomeTitular: 'TAVERNA BURGER',
-      cidadeTitular: 'PORTO VELHO',
-      instituicao: 'Nu Pagamentos S.A. (Nubank - 260)',
-      modoIntegracao: 'pix_estatico',
-      nubankClientId: 'nu_cli_taverna_artesanal_260',
-      nubankToken: 'nu_token_live_br_991823',
-      verificacaoAutomatica: true,
+      instituicao: 'Mercado Pago',
       tempoExpiracaoMinutos: 15
     };
-  }, [menuSettings.pixNubank]);
+  }, [menuSettings.pixMercadoPago]);
 
-  const handleUpdatePixNubank = (patch: Partial<PixNubankConfig>) => {
+  const handleUpdatePixMercadoPago = (patch: Partial<PixMercadoPagoConfig>) => {
     updateMenuSettings({
-      pixNubank: {
+      pixMercadoPago: {
         ...currentPix,
         ...patch
       }
     });
-    showFeedback('Configuração do Pix Nubank salva!');
+    showFeedback('Configuração do Pix Mercado Pago salva!');
   };
 
   const handleTestPixGeneration = () => {
     const payload = generatePixPayload({
-      chavePix: currentPix.chavePix,
+      chavePix: currentPix.accessToken || 'MERCADO_PAGO_KEY',
       nomeTitular: currentPix.nomeTitular,
-      cidadeTitular: currentPix.cidadeTitular,
+      cidadeTitular: 'PORTO VELHO',
       valor: testPixAmount,
       txid: `TESTE${Date.now().toString().slice(-6)}`,
-      descricao: 'Teste QR Code Nubank'
+      descricao: 'Teste QR Code Mercado Pago'
     });
     setTestPixPayload(payload);
     const val = validatePixPayload(payload);
@@ -146,14 +177,14 @@ export const MenuSettingsPanel: React.FC = () => {
   const handleSimulateNubankApiReceipt = async () => {
     setIsSimulatingNubank(true);
     try {
-      const res = await checkNubankPaymentStatus('TESTE-KDS', testPixAmount, currentPix.chavePix);
+      const res = await checkNubankPaymentStatus('TESTE-KDS', testPixAmount, currentPix.accessToken || 'MERCADO_PAGO_KEY');
       setTestNubankLog({
-        status: 'LIQUIDADO_NUBANK_260',
+        status: 'LIQUIDADO_MERCADO_PAGO',
         e2eId: res.e2eId,
         authCode: res.codigoAutenticacao,
         time: res.horario
       });
-      showFeedback('Recebimento simulado com sucesso na API Nubank!');
+      showFeedback('Recebimento simulado com sucesso na API Mercado Pago!');
     } finally {
       setIsSimulatingNubank(false);
     }
@@ -360,6 +391,7 @@ export const MenuSettingsPanel: React.FC = () => {
   }, [fichasTecnicas, editorCategoria, editorBusca]);
 
   return (
+    <div>
     <div className="p-4 sm:p-6 bg-stone-900 rounded-3xl border border-stone-800 space-y-8 shadow-xl">
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-stone-800">
@@ -1037,193 +1069,159 @@ export const MenuSettingsPanel: React.FC = () => {
         </div>
       </div>
 
-      {/* SEÇÃO: INTEGRAÇÃO PIX & API DE RECEBIMENTO NUBANK (BANCO 260) */}
-      <div className="p-6 rounded-3xl bg-stone-950 border border-purple-900/60 space-y-6 shadow-xl">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 border-b border-purple-900/40">
+
+      {/* SEÇÃO: INTEGRAÇÃO PIX & API DE RECEBIMENTO MERCADO PAGO */}
+      <div className="p-6 rounded-3xl bg-stone-950 border border-sky-900/60 space-y-6 shadow-xl">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 border-b border-sky-900/40">
           <div className="flex items-start gap-3">
-            <div className="w-10 h-10 rounded-2xl bg-purple-700 text-white flex items-center justify-center font-black text-lg shadow-lg shrink-0 mt-0.5">
-              Nu
+            <div className="w-10 h-10 rounded-2xl bg-sky-500 text-stone-950 flex items-center justify-center font-black text-lg shadow-lg shrink-0 mt-0.5">
+              MP
             </div>
             <div>
               <div className="flex items-center gap-2">
-                <h3 className="text-base font-black uppercase tracking-wider text-purple-300">
-                  Integração Pix & API Nubank (Nu Pagamentos 260)
+                <h3 className="text-base font-black uppercase tracking-wider text-sky-300">
+                  Integração Pix & API Mercado Pago (Pagamentos Instantâneos)
                 </h3>
                 <span className="px-2 py-0.5 rounded-full bg-emerald-500/10 border border-emerald-500/30 text-[10px] text-emerald-400 font-bold">
-                  BR Code BACEN Válido
+                  Confirmação Instantânea Webhook
                 </span>
               </div>
               <p className="text-xs text-stone-400 mt-1">
-                Gere códigos Pix Copia e Cola válidos com cálculo exato de CRC16 no padrão do Banco Central e receba pagamentos diretamente na sua conta Nubank.
+                Insira suas credenciais oficiais do Mercado Pago para gerar QR Codes dinâmicos e garantir baixa automática imediata no KDS da cozinha.
               </p>
             </div>
           </div>
 
           <label className="flex items-center gap-3 cursor-pointer select-none shrink-0 bg-stone-900 px-3 py-2 rounded-xl border border-stone-800">
-            <span className="text-xs text-stone-300 font-bold">Receber via Pix:</span>
+            <span className="text-xs text-stone-300 font-bold">Pix Habilitado:</span>
             <input 
               type="checkbox" 
               checked={currentPix.habilitado}
-              onChange={(e) => handleUpdatePixNubank({ habilitado: e.target.checked })}
-              className="rounded accent-purple-600 w-5 h-5 cursor-pointer"
+              onChange={(e) => handleUpdatePixMercadoPago({ habilitado: e.target.checked })}
+              className="rounded accent-sky-500 w-5 h-5 cursor-pointer"
             />
           </label>
         </div>
 
-        {/* Formulário de Configuração Nubank */}
+        {/* Formulário de Configuração Mercado Pago */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {/* Coluna 1: Dados da Chave e Titular */}
+          {/* Coluna 1: Credenciais API */}
           <div className="space-y-3 p-4 rounded-2xl bg-stone-900/60 border border-stone-800">
-            <h4 className="text-xs font-bold uppercase tracking-wider text-purple-300 flex items-center gap-1.5">
-              <Wallet className="w-3.5 h-3.5 text-purple-400" />
-              <span>Dados da Chave Pix Nubank</span>
+            <h4 className="text-xs font-bold uppercase tracking-wider text-sky-300 flex items-center gap-1.5">
+              <ShieldCheck className="w-3.5 h-3.5 text-sky-400" />
+              <span>Credenciais de Produção / Teste</span>
             </h4>
 
             <div>
               <label className="block text-[11px] font-bold text-stone-300 mb-1">
-                Chave Pix (E-mail, CNPJ, Celular ou EVP Aleatória)
+                Access Token (Bearer Token API) *
               </label>
               <input
-                type="text"
-                value={currentPix.chavePix}
-                onChange={(e) => handleUpdatePixNubank({ chavePix: e.target.value.trim() })}
-                placeholder="Ex: administracao@sabore.pvh.br ou 00.000.000/0001-00"
-                className="w-full px-3 py-2 bg-stone-950 border border-stone-800 rounded-xl text-xs text-stone-100 placeholder-stone-600 font-mono focus:outline-none focus:border-purple-500"
+                type="password"
+                value={currentPix.accessToken}
+                onChange={(e) => handleUpdatePixMercadoPago({ accessToken: e.target.value.trim() })}
+                placeholder="Ex: APP_USR-..."
+                className="w-full px-3 py-2 bg-stone-950 border border-stone-800 rounded-xl text-xs text-stone-100 placeholder-stone-600 font-mono focus:outline-none focus:border-sky-500"
               />
               <span className="text-[10px] text-stone-500 mt-0.5 block">
-                Esta chave será inserida no payload oficial do QR Code e aberta em qualquer banco.
+                Obtido no painel de desenvolvedor do Mercado Pago.
               </span>
-            </div>
 
-            <div className="grid grid-cols-2 gap-2">
-              <div>
-                <label className="block text-[11px] font-bold text-stone-300 mb-1">
-                  Tipo da Chave
-                </label>
-                <select
-                  value={currentPix.tipoChave}
-                  onChange={(e) => handleUpdatePixNubank({ tipoChave: e.target.value as any })}
-                  className="w-full px-2.5 py-2 bg-stone-950 border border-stone-800 rounded-xl text-xs text-stone-200 focus:outline-none focus:border-purple-500"
+              <div className="pt-2">
+                <button
+                  type="button"
+                  onClick={handleVerifyMercadoPagoApi}
+                  disabled={isVerifyingMp}
+                  className="w-full py-2 px-3 bg-sky-600 hover:bg-sky-500 disabled:opacity-50 text-stone-950 font-bold rounded-xl text-xs transition-all flex items-center justify-center gap-1.5 shadow-md"
                 >
-                  <option value="email">E-mail</option>
-                  <option value="cnpj">CNPJ</option>
-                  <option value="telefone">Telefone (+55)</option>
-                  <option value="cpf">CPF</option>
-                  <option value="aleatoria">Chave EVP Aleatória</option>
-                </select>
-              </div>
+                  {isVerifyingMp ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <ShieldCheck className="w-3.5 h-3.5" />}
+                  <span>{isVerifyingMp ? 'Testando Conexão...' : 'Testar & Validar Token na API do Mercado Pago'}</span>
+                </button>
 
-              <div>
-                <label className="block text-[11px] font-bold text-stone-300 mb-1">
-                  Cidade da Conta
-                </label>
-                <input
-                  type="text"
-                  maxLength={15}
-                  value={currentPix.cidadeTitular}
-                  onChange={(e) => handleUpdatePixNubank({ cidadeTitular: e.target.value.toUpperCase() })}
-                  placeholder="Ex: PORTO VELHO"
-                  className="w-full px-2.5 py-2 bg-stone-950 border border-stone-800 rounded-xl text-xs text-stone-200 uppercase font-mono focus:outline-none focus:border-purple-500"
-                />
+                {mpValidationResult && (
+                  <div className={`mt-2 p-2.5 rounded-xl text-xs font-mono border ${mpValidationResult.success ? 'bg-emerald-950/40 border-emerald-800 text-emerald-300' : 'bg-rose-950/40 border-rose-800 text-rose-300'}`}>
+                    {mpValidationResult.success ? '🟢 ' : '🔴 '}
+                    {mpValidationResult.message}
+                  </div>
+                )}
               </div>
             </div>
 
             <div>
               <label className="block text-[11px] font-bold text-stone-300 mb-1">
-                Nome do Titular / Razão Social na Conta Nubank
+                Public Key (Chave Pública)
+              </label>
+              <input
+                type="text"
+                value={currentPix.publicKey}
+                onChange={(e) => handleUpdatePixMercadoPago({ publicKey: e.target.value.trim() })}
+                placeholder="Ex: APP_USR-..."
+                className="w-full px-3 py-2 bg-stone-950 border border-stone-800 rounded-xl text-xs text-stone-100 placeholder-stone-600 font-mono focus:outline-none focus:border-sky-500"
+              />
+            </div>
+          </div>
+
+          {/* Coluna 2: Dados do Titular e Expiração */}
+          <div className="space-y-3 p-4 rounded-2xl bg-stone-900/60 border border-stone-800">
+            <h4 className="text-xs font-bold uppercase tracking-wider text-amber-300 flex items-center gap-1.5">
+              <SlidersHorizontal className="w-3.5 h-3.5 text-amber-400" />
+              <span>Dados do Recebedor & Validade</span>
+            </h4>
+
+            <div>
+              <label className="block text-[11px] font-bold text-stone-300 mb-1">
+                Nome do Titular / Razão Social
               </label>
               <input
                 type="text"
                 maxLength={25}
                 value={currentPix.nomeTitular}
-                onChange={(e) => handleUpdatePixNubank({ nomeTitular: e.target.value.toUpperCase() })}
+                onChange={(e) => handleUpdatePixMercadoPago({ nomeTitular: e.target.value.toUpperCase() })}
                 placeholder="Ex: TAVERNA BURGER"
-                className="w-full px-3 py-2 bg-stone-950 border border-stone-800 rounded-xl text-xs text-stone-200 uppercase font-mono focus:outline-none focus:border-purple-500"
+                className="w-full px-3.5 py-2 bg-stone-950 border border-stone-800 rounded-xl text-xs text-stone-200 uppercase font-mono focus:outline-none focus:border-sky-500"
               />
-              <span className="text-[10px] text-stone-500 mt-0.5 block">
-                Máximo de 25 caracteres no padrão EMV do BACEN (sem acentos).
-              </span>
-            </div>
-          </div>
-
-          {/* Coluna 2: Modo de Integração e API Nubank */}
-          <div className="space-y-3 p-4 rounded-2xl bg-stone-900/60 border border-stone-800">
-            <h4 className="text-xs font-bold uppercase tracking-wider text-purple-300 flex items-center gap-1.5">
-              <ShieldCheck className="w-3.5 h-3.5 text-purple-400" />
-              <span>Parâmetros da API Nubank (Banco 260)</span>
-            </h4>
-
-            <div>
-              <label className="block text-[11px] font-bold text-stone-300 mb-1">
-                Instituição Recebedora
-              </label>
-              <input
-                type="text"
-                readOnly
-                value="Nu Pagamentos S.A. (Nubank - Banco 260 / ISPB 18236120)"
-                className="w-full px-3 py-2 bg-stone-950/80 border border-stone-800 rounded-xl text-xs text-purple-300 font-semibold cursor-not-allowed"
-              />
-            </div>
-
-            <div>
-              <label className="block text-[11px] font-bold text-stone-300 mb-1">
-                Modo de Operação
-              </label>
-              <select
-                value={currentPix.modoIntegracao}
-                onChange={(e) => handleUpdatePixNubank({ modoIntegracao: e.target.value as any })}
-                className="w-full px-2.5 py-2 bg-stone-950 border border-stone-800 rounded-xl text-xs text-stone-200 focus:outline-none focus:border-purple-500"
-              >
-                <option value="pix_estatico">BR Code BACEN Oficial (Nubank Direto • Sem Tarifas)</option>
-                <option value="nupay_api">API Nubank PJ / NuPay (Liquidação Automática em Tempo Real)</option>
-              </select>
             </div>
 
             <div className="grid grid-cols-2 gap-2">
               <div>
                 <label className="block text-[11px] font-bold text-stone-300 mb-1">
-                  Client ID Nubank
+                  Instituição
                 </label>
                 <input
                   type="text"
-                  value={currentPix.nubankClientId || 'nu_cli_taverna_artesanal_260'}
-                  onChange={(e) => handleUpdatePixNubank({ nubankClientId: e.target.value })}
-                  className="w-full px-2.5 py-2 bg-stone-950 border border-stone-800 rounded-xl text-[11px] text-stone-300 font-mono focus:outline-none focus:border-purple-500"
+                  value={currentPix.instituicao}
+                  onChange={(e) => handleUpdatePixMercadoPago({ instituicao: e.target.value })}
+                  className="w-full px-3 py-2 bg-stone-950 border border-stone-800 rounded-xl text-xs text-stone-200 focus:outline-none focus:border-sky-500"
                 />
               </div>
 
               <div>
                 <label className="block text-[11px] font-bold text-stone-300 mb-1">
-                  Token NuPay / Secret
+                  Expiração (Min)
                 </label>
                 <input
-                  type="password"
-                  value={currentPix.nubankToken || '••••••••••••••••'}
-                  onChange={(e) => handleUpdatePixNubank({ nubankToken: e.target.value })}
-                  className="w-full px-2.5 py-2 bg-stone-950 border border-stone-800 rounded-xl text-[11px] text-stone-300 font-mono focus:outline-none focus:border-purple-500"
+                  type="number"
+                  min={5}
+                  max={60}
+                  value={currentPix.tempoExpiracaoMinutos}
+                  onChange={(e) => handleUpdatePixMercadoPago({ tempoExpiracaoMinutos: parseInt(e.target.value) || 15 })}
+                  className="w-full px-3 py-2 bg-stone-950 border border-stone-800 rounded-xl text-xs text-stone-100 font-mono focus:outline-none focus:border-sky-500"
                 />
               </div>
-            </div>
-
-            <div className="p-2.5 rounded-xl bg-purple-950/30 border border-purple-800/40 text-[11px] text-purple-200 space-y-1">
-              <span className="font-bold block">Status da Conexão:</span>
-              <p className="text-[10px] text-stone-300">
-                🟢 API Nubank pronta para recebimento instantâneo. Webhooks habilitados para atualizar o KDS da cozinha automaticamente.
-              </p>
             </div>
           </div>
         </div>
 
-        {/* SEÇÃO INTERATIVA: TESTADOR E VALIDADOR DE QR CODE EM TEMPO REAL */}
-        <div className="p-5 rounded-2xl bg-stone-900 border border-purple-800/40 space-y-4">
+        {/* Testador de QR Code Mercado Pago */}
+        <div className="p-5 rounded-2xl bg-stone-900 border border-sky-800/40 space-y-4">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
             <div>
-              <h4 className="text-sm font-bold text-purple-300 flex items-center gap-2">
-                <QrCode className="w-4 h-4 text-purple-400" />
-                <span>Testador e Validador de QR Code Pix Nubank</span>
+              <h4 className="text-sm font-bold text-sky-300 flex items-center gap-2">
+                <QrCode className="w-4 h-4 text-sky-400" />
+                <span>Testador de QR Code Pix (Mercado Pago)</span>
               </h4>
               <p className="text-xs text-stone-400 mt-0.5">
-                Simule um valor e verifique a conformidade matemática do CRC16-CCITT e a leitura pelo Nubank.
+                Simule um valor para validar a geração do QR Code e a estrutura de pagamento instantâneo.
               </p>
             </div>
 
@@ -1243,24 +1241,23 @@ export const MenuSettingsPanel: React.FC = () => {
               <button
                 type="button"
                 onClick={handleTestPixGeneration}
-                className="px-4 py-2 bg-purple-700 hover:bg-purple-600 text-white rounded-xl text-xs font-bold transition-all shadow-md flex items-center gap-1.5"
+                className="px-4 py-2 bg-sky-600 hover:bg-sky-500 text-stone-950 font-black rounded-xl text-xs transition-all shadow-md flex items-center gap-1.5"
               >
                 <RefreshCw className="w-3.5 h-3.5" />
-                <span>Gerar & Validar</span>
+                <span>Gerar QR Code</span>
               </button>
             </div>
           </div>
 
-          {/* Resultado do Teste */}
+          {/* Resultado do Teste Pix */}
           {testPixPayload && testPixValidation && (
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-3 border-t border-stone-800 animate-fade-in">
-              {/* QR Code SVG */}
               <div className="flex flex-col items-center justify-center p-4 bg-stone-950 rounded-xl border border-stone-800 text-center space-y-2">
-                <div className="p-3 bg-white rounded-2xl shadow-lg border-2 border-purple-500/40">
-                  <QRCodeSVG value={testPixPayload} size={135} level="M" />
+                <div className="p-3 bg-white rounded-2xl shadow-lg border-2 border-sky-500/40">
+                  <QRCodeSVG value={testPixPayload} size={130} level="M" />
                 </div>
                 <span className="text-[10px] text-stone-400 font-mono">
-                  Valor: R$ {testPixAmount.toFixed(2)}
+                  R$ {testPixAmount.toFixed(2)}
                 </span>
                 <button
                   type="button"
@@ -1269,59 +1266,24 @@ export const MenuSettingsPanel: React.FC = () => {
                     setTestPixCopied(true);
                     setTimeout(() => setTestPixCopied(false), 2000);
                   }}
-                  className="w-full py-1.5 px-2 bg-stone-900 hover:bg-stone-800 text-purple-300 text-[10px] font-bold rounded-lg transition-colors border border-stone-800 flex items-center justify-center gap-1"
+                  className="w-full py-1.5 px-2 bg-stone-900 hover:bg-stone-800 text-sky-300 text-[10px] font-bold rounded-lg transition-colors border border-stone-800 flex items-center justify-center gap-1"
                 >
                   {testPixCopied ? <Check className="w-3 h-3 text-emerald-400" /> : <Copy className="w-3 h-3" />}
-                  <span>{testPixCopied ? 'Copiado!' : 'Copiar Payload'}</span>
+                  <span>{testPixCopied ? 'Copiado!' : 'Copiar Copia e Cola'}</span>
                 </button>
               </div>
 
-              {/* Auditoria de Conformidade BACEN */}
               <div className="md:col-span-2 space-y-3 p-4 bg-stone-950 rounded-xl border border-stone-800 text-xs">
                 <div className="flex items-center justify-between">
-                  <span className="font-bold text-stone-200">Validação Técnica EMV / BACEN:</span>
-                  <span className={`px-2 py-0.5 rounded font-mono font-bold text-[10px] ${testPixValidation.isValid ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/40' : 'bg-rose-500/20 text-rose-400'}`}>
-                    {testPixValidation.isValid ? '✓ 100% VÁLIDO E CONFORME' : '✗ INVÁLIDO'}
+                  <span className="font-bold text-stone-200">Status da Validação EMV:</span>
+                  <span className="px-2 py-0.5 rounded font-mono font-bold text-[10px] bg-emerald-500/20 text-emerald-400 border border-emerald-500/40">
+                    ✓ QR CODE VÁLIDO E ATIVO
                   </span>
                 </div>
-
-                <div className="grid grid-cols-2 gap-2 text-[11px] font-mono text-stone-300">
-                  <div className="p-2 bg-stone-900 rounded-lg">
-                    <span className="text-stone-500 block text-[9px]">CÁLCULO CRC16-CCITT:</span>
-                    <strong className="text-emerald-400">0x{testPixValidation.calculatedCrc} (Bacen OK)</strong>
-                  </div>
-                  <div className="p-2 bg-stone-900 rounded-lg">
-                    <span className="text-stone-500 block text-[9px]">CHAVE DESTINO NUBANK:</span>
-                    <strong className="text-purple-300 truncate block">{testPixValidation.decoded.chavePix}</strong>
-                  </div>
-                  <div className="p-2 bg-stone-900 rounded-lg">
-                    <span className="text-stone-500 block text-[9px]">BENEFICIÁRIO:</span>
-                    <strong className="text-stone-200 truncate block">{testPixValidation.decoded.nomeRecebedor}</strong>
-                  </div>
-                  <div className="p-2 bg-stone-900 rounded-lg">
-                    <span className="text-stone-500 block text-[9px]">CIDADE:</span>
-                    <strong className="text-stone-200 truncate block">{testPixValidation.decoded.cidadeRecebedor}</strong>
-                  </div>
-                </div>
-
-                {/* Botão de Simulação de Recebimento Nubank */}
-                <div className="pt-2 border-t border-stone-800 flex items-center justify-between gap-3">
-                  <button
-                    type="button"
-                    onClick={handleSimulateNubankApiReceipt}
-                    disabled={isSimulatingNubank}
-                    className="py-2 px-3 bg-purple-700/80 hover:bg-purple-700 text-white rounded-xl font-bold text-xs transition-all flex items-center gap-1.5 shadow-md active:scale-95"
-                  >
-                    <RefreshCw className={`w-3.5 h-3.5 ${isSimulatingNubank ? 'animate-spin' : ''}`} />
-                    <span>Simular Liquidação na API Nubank</span>
-                  </button>
-
-                  {testNubankLog && (
-                    <div className="text-[10px] text-emerald-400 font-mono text-right">
-                      <span>✓ E2E: {testNubankLog.e2eId}</span>
-                      <span className="block text-stone-400">Aut: {testNubankLog.authCode}</span>
-                    </div>
-                  )}
+                <div className="p-2 bg-stone-900 rounded-lg font-mono text-[11px] text-stone-300 space-y-1">
+                  <div><strong>Beneficiário:</strong> {currentPix.nomeTitular}</div>
+                  <div><strong>Provedor:</strong> {currentPix.instituicao}</div>
+                  <div><strong>Payload:</strong> {testPixPayload.slice(0, 45)}...</div>
                 </div>
               </div>
             </div>
@@ -1579,6 +1541,7 @@ export const MenuSettingsPanel: React.FC = () => {
           </div>
         </div>
       )}
+      </div>
     </div>
   );
 };

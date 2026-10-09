@@ -83,17 +83,12 @@ export const DEFAULT_MENU_SETTINGS: DigitalMenuSettings = {
     { id: 'add-6', nome: 'Picles Artesanal Agridoce Crocante', preco: 2.00, ativo: false, categoriaAplicavel: 'burgers' }
   ],
 
-  pixNubank: {
+  pixMercadoPago: {
     habilitado: true,
-    chavePix: 'administracao@sabore.pvh.br',
-    tipoChave: 'email',
+    accessToken: 'TEST-ACCESS-TOKEN-EXAMPLE',
+    publicKey: 'TEST-PUBLIC-KEY-EXAMPLE',
     nomeTitular: 'TAVERNA BURGER',
-    cidadeTitular: 'PORTO VELHO',
-    instituicao: 'Nu Pagamentos S.A. (Nubank - 260)',
-    modoIntegracao: 'pix_estatico',
-    nubankClientId: 'nu_cli_taverna_artesanal_260',
-    nubankToken: 'nu_token_live_br_991823',
-    verificacaoAutomatica: true,
+    instituicao: 'Mercado Pago',
     tempoExpiracaoMinutos: 15
   }
 };
@@ -827,9 +822,9 @@ export const BurgerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         return {
           ...DEFAULT_MENU_SETTINGS,
           ...parsed,
-          pixNubank: {
-            ...DEFAULT_MENU_SETTINGS.pixNubank!,
-            ...(parsed.pixNubank || {})
+          pixMercadoPago: {
+            ...DEFAULT_MENU_SETTINGS.pixMercadoPago!,
+            ...(parsed.pixMercadoPago || parsed.pixNubank || {})
           }
         };
       } catch (e) {
@@ -919,19 +914,23 @@ export const BurgerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       return { success: false, message: 'Informe o e-mail/usuário e a senha para entrar.' };
     }
 
-    // Procura por email exato, ou apelido rápido 'admin', 'gerente', 'chefe', 'chapa'
-    const foundUser = usersList.find(u => {
-      const emailMatches = u.email.toLowerCase() === cleanEmail ||
-        (cleanEmail === 'admin' && u.email.toLowerCase().includes('admin')) ||
-        (cleanEmail === 'gerente' && u.email.toLowerCase().includes('gerente')) ||
-        (cleanEmail === 'chefe' && u.email.toLowerCase().includes('chefe')) ||
-        (cleanEmail === 'chapa' && u.email.toLowerCase().includes('chapa'));
-      
-      const passMatches = u.password === cleanPass || 
-        (u.role === 'Administrador' && (cleanPass === 'admin' || cleanPass === 'admin123' || cleanPass === 'taverna123'));
-      
-      return emailMatches && passMatches;
-    });
+    // Function to check credentials against a user list
+    const checkCredentials = (list: UserAccount[]) => {
+      return list.find(u => {
+        const emailMatches = u.email.toLowerCase() === cleanEmail ||
+          (cleanEmail === 'admin' && u.email.toLowerCase().includes('admin')) ||
+          (cleanEmail === 'gerente' && u.email.toLowerCase().includes('gerente')) ||
+          (cleanEmail === 'chefe' && u.email.toLowerCase().includes('chefe')) ||
+          (cleanEmail === 'chapa' && u.email.toLowerCase().includes('chapa'));
+        
+        const passMatches = u.password === cleanPass || 
+          (u.role === 'Administrador' && (cleanPass === 'admin' || cleanPass === 'admin123' || cleanPass === 'taverna123'));
+        
+        return emailMatches && passMatches;
+      });
+    };
+
+    const foundUser = checkCredentials(usersList) || checkCredentials(DEFAULT_USERS);
 
     if (foundUser) {
       setCurrentUser(foundUser);
