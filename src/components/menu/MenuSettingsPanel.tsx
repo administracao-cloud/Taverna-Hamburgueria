@@ -82,6 +82,7 @@ export const MenuSettingsPanel: React.FC = () => {
   const [testPixCopied, setTestPixCopied] = useState(false);
   const [isVerifyingMp, setIsVerifyingMp] = useState(false);
   const [mpValidationResult, setMpValidationResult] = useState<{ success: boolean; message: string; mode?: string; user?: any } | null>(null);
+  const [showMpGuide, setShowMpGuide] = useState(false);
 
   const handleVerifyMercadoPagoApi = async () => {
     setIsVerifyingMp(true);
@@ -1089,6 +1090,13 @@ export const MenuSettingsPanel: React.FC = () => {
               <p className="text-xs text-stone-400 mt-1">
                 Insira suas credenciais oficiais do Mercado Pago para gerar QR Codes dinâmicos e garantir baixa automática imediata no KDS da cozinha.
               </p>
+              <button
+                type="button"
+                onClick={() => setShowMpGuide(!showMpGuide)}
+                className="mt-2 text-xs font-bold text-sky-400 hover:text-sky-300 flex items-center gap-1.5 underline underline-offset-2 transition-colors"
+              >
+                <span>{showMpGuide ? 'Ocultar Passo a Passo' : '📚 Ver Passo a Passo: Como Criar Aplicação e Obter Credenciais'}</span>
+              </button>
             </div>
           </div>
 
@@ -1102,6 +1110,27 @@ export const MenuSettingsPanel: React.FC = () => {
             />
           </label>
         </div>
+
+        {showMpGuide && (
+          <div className="p-4 rounded-2xl bg-sky-950/30 border border-sky-800/60 space-y-3 text-xs text-stone-300 animate-fade-in">
+            <h4 className="font-black text-sky-300 uppercase tracking-wide flex items-center gap-2">
+              <span>🚀 Passo a Passo: Como Criar sua Aplicação no Mercado Pago</span>
+            </h4>
+            <ol className="list-decimal list-inside space-y-1.5 text-stone-300 leading-relaxed">
+              <li>Acesse o site oficial de Desenvolvedores do Mercado Pago (<a href="https://www.mercadopago.com.br/developers" target="_blank" rel="noreferrer" className="text-sky-400 underline font-mono">mercadopago.com.br/developers</a>) e faça login com sua conta.</li>
+              <li>No menu principal ou superior, clique em <strong className="text-white">"Suas Aplicações"</strong>.</li>
+              <li>Clique no botão <strong className="text-white">"Criar aplicação"</strong>.</li>
+              <li>Dê um nome para sua aplicação (ex: <span className="text-amber-300 font-mono">Taverna Burger Delivery</span>), selecione a solução <strong className="text-white">"Pagamentos online"</strong> e confirme.</li>
+              <li>Com a aplicação criada, vá na aba <strong className="text-white">"Credenciais de Produção"</strong> (ou Teste, se estiver testando).</li>
+              <li>Copie o seu <strong className="text-white">Access Token</strong> (o token começa com <code className="bg-stone-900 px-1.5 py-0.5 rounded text-sky-300 font-mono">APP_USR-...</code>) e cole no campo <em>Access Token (Bearer Token API)</em> abaixo.</li>
+              <li>(Opcional) Copie também a sua <strong className="text-white">Public Key</strong> e cole no campo de Chave Pública.</li>
+              <li>Clique no botão azul <strong className="text-white">"Testar & Validar Token na API do Mercado Pago"</strong> para confirmar a conexão com sucesso!</li>
+            </ol>
+            <div className="pt-2 border-t border-sky-900/40 text-[11px] text-stone-400">
+              💡 <span className="font-bold text-stone-300">Dica:</span> Certifique-se de copiar o <strong>Access Token</strong> (e não a Public Key) no campo Access Token para que a geração de QR Code Pix funcione perfeitamente.
+            </div>
+          </div>
+        )}
 
         {/* Formulário de Configuração Mercado Pago */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

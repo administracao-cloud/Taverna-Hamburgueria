@@ -32,7 +32,17 @@ async function startServer() {
         }
       });
 
-      const data = await response.json();
+      const contentType = response.headers.get('content-type');
+      let data: any = {};
+      if (contentType && contentType.includes('application/json')) {
+        data = await response.json();
+      } else {
+        const textResponse = await response.text();
+        return res.status(400).json({
+          success: false,
+          error: `Erro na API do Mercado Pago (${response.status}): O servidor retornou uma resposta não JSON. Verifique se o Access Token está correto (Tokens de Produção começam com APP_USR- e de Teste com TEST-).`
+        });
+      }
 
       if (!response.ok) {
         return res.status(400).json({
