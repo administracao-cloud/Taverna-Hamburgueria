@@ -189,6 +189,19 @@ export const TechnicalSheetsView: React.FC<TechnicalSheetsViewProps> = ({
                     </span>
                   </div>
                 </div>
+
+                {/* Badges de Opções no Cardápio Digital */}
+                <div className="flex flex-wrap items-center gap-1.5 pt-1 text-[10px]">
+                  <span className={`px-2 py-0.5 rounded-md font-semibold border ${ficha.habilitarAdicionais !== false ? 'bg-amber-950/60 border-amber-500/40 text-amber-300' : 'bg-stone-950 border-stone-800 text-stone-600 line-through'}`}>
+                    + Adicionais {ficha.habilitarAdicionais !== false ? '✓' : '✕'}
+                  </span>
+                  <span className={`px-2 py-0.5 rounded-md font-semibold border ${ficha.habilitarRemocaoIngredientes !== false ? 'bg-rose-950/50 border-rose-500/40 text-rose-300' : 'bg-stone-950 border-stone-800 text-stone-600 line-through'}`}>
+                    - Remoções {ficha.habilitarRemocaoIngredientes !== false ? '✓' : '✕'}
+                  </span>
+                  <span className={`px-2 py-0.5 rounded-md font-semibold border ${ficha.perguntaSaches ? 'bg-emerald-950/50 border-emerald-500/40 text-emerald-300' : 'bg-stone-950 border-stone-800 text-stone-600 line-through'}`}>
+                    🥫 Sachês {ficha.perguntaSaches ? '✓' : '✕'}
+                  </span>
+                </div>
               </div>
 
               {/* Card Footer Actions */}

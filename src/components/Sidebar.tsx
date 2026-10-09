@@ -7,7 +7,8 @@ import {
   Scale, 
   TrendingUp, 
   Sparkles,
-  ShieldCheck
+  ShieldCheck,
+  Layers
 } from 'lucide-react';
 import { useBurger } from '../context/BakeryContext';
 
@@ -17,7 +18,8 @@ export type ActiveTab =
   | 'fichas'
   | 'estoque'
   | 'blends'
-  | 'simulador';
+  | 'simulador'
+  | 'menu';
 
 interface SidebarProps {
   activeTab: ActiveTab;
@@ -67,6 +69,12 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeTab, onSelectTab }) => {
       id: 'simulador' as ActiveTab,
       label: 'Simulador & Margens',
       icon: TrendingUp,
+      badge: null
+    },
+    {
+      id: 'menu' as ActiveTab,
+      label: 'Cardápio Digital',
+      icon: Layers,
       badge: null
     }
   ];

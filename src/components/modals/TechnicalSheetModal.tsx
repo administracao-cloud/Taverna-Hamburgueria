@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { FichaTecnica, RecipeCategory, IngredienteReceita } from '../../types';
 import { useBurger, recipeCategories } from '../../context/BakeryContext';
-import { X, Plus, Trash2, Calculator, Flame, AlertCircle, Info } from 'lucide-react';
+import { X, Plus, Trash2, Calculator, Flame, Printer } from 'lucide-react';
+import { generateThermalPDF } from '../../utils/thermalPrinter';
 
 interface TechnicalSheetModalProps {
   isOpen: boolean;
@@ -29,6 +30,11 @@ export const TechnicalSheetModal: React.FC<TechnicalSheetModalProps> = ({
   const [impostosTaxas, setImpostosTaxas] = useState(10);
   const [precoVendaPraticado, setPrecoVendaPraticado] = useState(38.00);
   const [modoPreparo, setModoPreparo] = useState<string[]>(['']);
+  
+  // Checkboxes administrativos solicitados
+  const [habilitarAdicionais, setHabilitarAdicionais] = useState(true);
+  const [habilitarRemocaoIngredientes, setHabilitarRemocaoIngredientes] = useState(true);
+  const [perguntaSaches, setPerguntaSaches] = useState(true);
 
   useEffect(() => {
     if (fichaParaEditar) {
@@ -45,6 +51,9 @@ export const TechnicalSheetModal: React.FC<TechnicalSheetModalProps> = ({
       setImpostosTaxas(fichaParaEditar.impostosTaxas || 10);
       setPrecoVendaPraticado(fichaParaEditar.precoVendaPraticado || 0);
       setModoPreparo(fichaParaEditar.modoPreparo?.length ? fichaParaEditar.modoPreparo : ['']);
+      setHabilitarAdicionais(fichaParaEditar.habilitarAdicionais !== false);
+      setHabilitarRemocaoIngredientes(fichaParaEditar.habilitarRemocaoIngredientes !== false);
+      setPerguntaSaches(fichaParaEditar.perguntaSaches !== undefined ? Boolean(fichaParaEditar.perguntaSaches) : true);
     } else {
       setNome('');
       setCategoria('Smash Burgers');
@@ -59,6 +68,9 @@ export const TechnicalSheetModal: React.FC<TechnicalSheetModalProps> = ({
       setImpostosTaxas(10);
       setPrecoVendaPraticado(38.00);
       setModoPreparo(['']);
+      setHabilitarAdicionais(true);
+      setHabilitarRemocaoIngredientes(true);
+      setPerguntaSaches(true);
     }
   }, [fichaParaEditar, isOpen]);
 
@@ -167,6 +179,9 @@ export const TechnicalSheetModal: React.FC<TechnicalSheetModalProps> = ({
       precoVendaPraticado: Number(precoVendaPraticado),
       cmvPercentual,
       modoPreparo: modoPreparo.filter(p => p.trim().length > 0),
+      habilitarAdicionais,
+      habilitarRemocaoIngredientes,
+      perguntaSaches,
       ativo: true
     };
 
@@ -196,12 +211,30 @@ export const TechnicalSheetModal: React.FC<TechnicalSheetModalProps> = ({
               </p>
             </div>
           </div>
-          <button 
-            onClick={onClose}
-            className="p-1.5 text-stone-300 hover:text-white rounded-lg hover:bg-stone-800 transition-colors"
-          >
-            <X className="w-5 h-5" />
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => {
+                const lines = [
+                  `Item: ${nome}`,
+                  `Categoria: ${categoria}`,
+                  `Custo Prod.: R$ ${custoTotalProducao.toFixed(2)}`,
+                  `Venda: R$ ${precoVendaPraticado.toFixed(2)}`
+                ];
+                generateThermalPDF('Ficha Técnica', lines);
+              }}
+              className="p-1.5 text-stone-300 hover:text-amber-500 rounded-lg hover:bg-stone-800 transition-colors"
+              title="Imprimir Ficha (58mm)"
+            >
+              <Printer className="w-5 h-5" />
+            </button>
+            <button 
+              onClick={onClose}
+              className="p-1.5 text-stone-300 hover:text-white rounded-lg hover:bg-stone-800 transition-colors"
+            >
+              <X className="w-5 h-5" />
+            </button>
+          </div>
         </div>
 
         <form onSubmit={handleSubmit} className="p-6 space-y-6 max-h-[80vh] overflow-y-auto">
@@ -551,6 +584,65 @@ export const TechnicalSheetModal: React.FC<TechnicalSheetModalProps> = ({
                 )}
               </div>
             ))}
+          </div>
+
+          {/* Opções Administrativas do Cardápio Digital (Checkboxes Solicitados) */}
+          <div className="p-4 rounded-xl bg-stone-950/80 border border-stone-800 space-y-3">
+            <div>
+              <h3 className="text-xs font-bold uppercase tracking-wider text-amber-400">
+                Opções do Cardápio Digital para o Cliente
+              </h3>
+              <p className="text-[11px] text-stone-400">
+                Marque quais opções de personalização estarão ativas para este item no site de pedidos.
+              </p>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+              <label className={`flex items-center gap-2.5 p-3 rounded-xl border text-xs cursor-pointer select-none transition-all ${
+                habilitarAdicionais ? 'bg-amber-950/30 border-amber-500/50 text-amber-300 font-bold' : 'bg-stone-900 border-stone-800 text-stone-500'
+              }`}>
+                <input
+                  type="checkbox"
+                  checked={habilitarAdicionais}
+                  onChange={(e) => setHabilitarAdicionais(e.target.checked)}
+                  className="rounded accent-amber-500 w-4 h-4 cursor-pointer"
+                />
+                <div>
+                  <span className="block text-xs font-semibold">Habilitar Adicionais</span>
+                  <span className="text-[10px] text-stone-400">Extras pagos no modal</span>
+                </div>
+              </label>
+
+              <label className={`flex items-center gap-2.5 p-3 rounded-xl border text-xs cursor-pointer select-none transition-all ${
+                habilitarRemocaoIngredientes ? 'bg-rose-950/30 border-rose-500/50 text-rose-300 font-bold' : 'bg-stone-900 border-stone-800 text-stone-500'
+              }`}>
+                <input
+                  type="checkbox"
+                  checked={habilitarRemocaoIngredientes}
+                  onChange={(e) => setHabilitarRemocaoIngredientes(e.target.checked)}
+                  className="rounded accent-rose-500 w-4 h-4 cursor-pointer"
+                />
+                <div>
+                  <span className="block text-xs font-semibold">Habilitar Remoção</span>
+                  <span className="text-[10px] text-stone-400">Sem cebola, sem molho</span>
+                </div>
+              </label>
+
+              <label className={`flex items-center gap-2.5 p-3 rounded-xl border text-xs cursor-pointer select-none transition-all ${
+                perguntaSaches ? 'bg-emerald-950/30 border-emerald-500/50 text-emerald-300 font-bold' : 'bg-stone-900 border-stone-800 text-stone-500'
+              }`}>
+                <input
+                  type="checkbox"
+                  checked={perguntaSaches}
+                  onChange={(e) => setPerguntaSaches(e.target.checked)}
+                  className="rounded accent-emerald-500 w-4 h-4 cursor-pointer"
+                />
+                <div>
+                  <span className="block text-xs font-semibold">Pergunta de Sachês</span>
+                  <span className="text-[10px] text-stone-400">Pergunta estilo iFood</span>
+                </div>
+              </label>
+            </div>
           </div>
 
           {/* Footer Actions */}

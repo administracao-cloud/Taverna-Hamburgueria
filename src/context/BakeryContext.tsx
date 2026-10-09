@@ -3,11 +3,60 @@ import {
   Insumo, 
   FichaTecnica, 
   OrdemChapa, 
+  ItemPedidoChapa,
   MaterialCategory, 
   RecipeCategory, 
   UserRole,
-  BlendCalculatorState
+  BlendCalculatorState,
+  DigitalMenuSettings,
+  AdicionalConfig
 } from '../types';
+import { 
+  TAVERNA_IFOOD_CATALOG, 
+  convertParsedItemToFicha, 
+  ParsedIFoodItem 
+} from '../utils/ifoodParser';
+import { printOrdemChapaThermal } from '../utils/thermalPrinter';
+import { generatePixPayload } from '../utils/pixPayload';
+
+export const DEFAULT_MENU_SETTINGS: DigitalMenuSettings = {
+  lojaAberta: true,
+  permitirDelivery: true,
+  permitirRetirada: true,
+  permitirSalao: false, // Default desmarcado para modo delivery prioritário
+  taxaEntregaPadrao: 5.00,
+  pedidoMinimo: 23.00,
+
+  habilitarPontoCarne: false, // Hambúrguer smash é smash crocante padrão
+  pontoCarnePadrao: 'Smash Crocante (Crosta Maillard)',
+
+  habilitarPerguntaSaches: true, // Estilo iFood
+  habilitarPerguntaGuardanapos: true,
+
+  habilitarAdicionais: true,
+  adicionais: [
+    { id: 'add-1', nome: 'Bacon Artesanal Crocante (+30g)', preco: 4.50, ativo: true, categoriaAplicavel: 'burgers' },
+    { id: 'add-2', nome: 'Creme de Cheddar Especial Taverna (+40g)', preco: 4.00, ativo: true, categoriaAplicavel: 'todos' },
+    { id: 'add-3', nome: 'Fatias Extras de Queijo Cheddar Inglês', preco: 3.50, ativo: true, categoriaAplicavel: 'burgers' },
+    { id: 'add-4', nome: 'Cebola Caramelizada no Açúcar Mascavo (+40g)', preco: 3.00, ativo: true, categoriaAplicavel: 'burgers' },
+    { id: 'add-5', nome: 'Pote de Maionese Verde Defumada da Casa', preco: 2.50, ativo: true, categoriaAplicavel: 'todos' },
+    { id: 'add-6', nome: 'Picles Artesanal Agridoce Crocante', preco: 2.00, ativo: false, categoriaAplicavel: 'burgers' }
+  ],
+
+  pixNubank: {
+    habilitado: true,
+    chavePix: 'administracao@sabore.pvh.br',
+    tipoChave: 'email',
+    nomeTitular: 'TAVERNA BURGER',
+    cidadeTitular: 'PORTO VELHO',
+    instituicao: 'Nu Pagamentos S.A. (Nubank - 260)',
+    modoIntegracao: 'pix_estatico',
+    nubankClientId: 'nu_cli_taverna_artesanal_260',
+    nubankToken: 'nu_token_live_br_991823',
+    verificacaoAutomatica: true,
+    tempoExpiracaoMinutos: 15
+  }
+};
 
 // Exactly matching required material categories
 export const materialCategories: MaterialCategory[] = [
@@ -316,6 +365,9 @@ const INITIAL_FICHAS: FichaTecnica[] = [
       'Montar no pão com molho especial na base, empilhar os dois smashes, adicionar bacon crocante e fechar.'
     ],
     pontoCarneRecomendado: 'Bem Crocante (Smash)',
+    habilitarAdicionais: true,
+    habilitarRemocaoIngredientes: true,
+    perguntaSaches: true,
     ativo: true,
     dataCriacao: '2026-09-20'
   },
@@ -353,6 +405,9 @@ const INITIAL_FICHAS: FichaTecnica[] = [
       'Passar maionese verde nas duas metades do pão selado, adicionar o burger com queijo, cobrir com a cebola caramelizada e fechar.'
     ],
     pontoCarneRecomendado: 'Ao Ponto (Rosado e Suculento)',
+    habilitarAdicionais: true,
+    habilitarRemocaoIngredientes: true,
+    perguntaSaches: true,
     ativo: true,
     dataCriacao: '2026-09-19'
   },
@@ -389,6 +444,9 @@ const INITIAL_FICHAS: FichaTecnica[] = [
       'Assentar o burger com gorgonzola, finalizar com rúcula fresca crocante e servir.'
     ],
     pontoCarneRecomendado: 'Ao Ponto para Menos',
+    habilitarAdicionais: true,
+    habilitarRemocaoIngredientes: true,
+    perguntaSaches: true,
     ativo: true,
     dataCriacao: '2026-09-18'
   },
@@ -421,6 +479,9 @@ const INITIAL_FICHAS: FichaTecnica[] = [
       'Escorrer em grade e polvilhar mix de sal de parrilla e páprica defumada.',
       'Embalar e servir com pote de maionese verde fresca.'
     ],
+    habilitarAdicionais: true,
+    habilitarRemocaoIngredientes: false,
+    perguntaSaches: true,
     ativo: true,
     dataCriacao: '2026-09-15'
   },
@@ -453,6 +514,9 @@ const INITIAL_FICHAS: FichaTecnica[] = [
       'Incorporar picles brunoise e especiarias.',
       'Armazenar em bisnagas dosadoras refrigeradas entre 2°C e 4°C com validade de 5 dias.'
     ],
+    habilitarAdicionais: false,
+    habilitarRemocaoIngredientes: false,
+    perguntaSaches: false,
     ativo: true,
     dataCriacao: '2026-09-12'
   }
@@ -544,15 +608,132 @@ const INITIAL_BLEND_CALCULATOR: BlendCalculatorState = {
   pesoPuckGramas: 160
 };
 
+const BLANK_COPY_TEMPLATE: Omit<FichaTecnica, 'id' | 'dataCriacao'>[] = [
+  {
+    nome: 'Burger Artesanal Clássico',
+    categoria: 'Smash Burgers',
+    descricao: 'Pão brioche selado na manteiga, blend artesanal suculento 120g na chapa, queijo cheddar cremoso e maionese especial da casa.',
+    tempoPreparoMinutos: 12,
+    ingredientes: [],
+    pesoCruTotal: 120,
+    fatorReducaoChapa: 15,
+    pesoGrelhado: 102,
+    rendimentoPorcoes: 1,
+    custoInsumos: 9.50,
+    custoEmbalagem: 1.80,
+    custoMaoDeObra: 2.50,
+    custoTotalProducao: 13.80,
+    margemLucroAlvo: 60,
+    impostosTaxas: 10,
+    precoVendaSugerido: 28.00,
+    precoVendaPraticado: 28.90,
+    precoOriginal: 34.00,
+    cmvPercentual: 32.9,
+    modoPreparo: ['Tostar pão brioche na manteiga', 'Prensagem smash na chapa 230°C com crosta maillard', 'Derreter queijo cheddar e finalizar'],
+    pontoCarneRecomendado: 'Smash Crocante',
+    imagemUrl: 'https://images.unsplash.com/photo-1568901346375-23c9450c58cd?w=600&auto=format&fit=crop&q=80',
+    destaque: true,
+    habilitarAdicionais: true,
+    habilitarRemocaoIngredientes: true,
+    perguntaSaches: true,
+    ativo: true
+  },
+  {
+    nome: 'Smash Duplo com Bacon Crocante',
+    categoria: 'Smash Burgers',
+    descricao: '2x discos smash crocantes de 90g, fatias generosas de bacon defumado, dobro de cheddar e molho barbecue rústico.',
+    tempoPreparoMinutos: 14,
+    ingredientes: [],
+    pesoCruTotal: 180,
+    fatorReducaoChapa: 18,
+    pesoGrelhado: 148,
+    rendimentoPorcoes: 1,
+    custoInsumos: 12.80,
+    custoEmbalagem: 1.80,
+    custoMaoDeObra: 2.50,
+    custoTotalProducao: 17.10,
+    margemLucroAlvo: 58,
+    impostosTaxas: 10,
+    precoVendaSugerido: 35.00,
+    precoVendaPraticado: 35.90,
+    precoOriginal: 42.00,
+    cmvPercentual: 35.6,
+    modoPreparo: ['Tostar pão', 'Prensagem smash duplo', 'Grelhar bacon até ficar crocante', 'Montagem final com barbecue'],
+    pontoCarneRecomendado: 'Smash Crocante',
+    imagemUrl: 'https://images.unsplash.com/photo-1586190848861-99aa4a171e90?w=600&auto=format&fit=crop&q=80',
+    destaque: true,
+    habilitarAdicionais: true,
+    habilitarRemocaoIngredientes: true,
+    perguntaSaches: true,
+    ativo: true
+  },
+  {
+    nome: 'Batata Rústica Temperada com Alecrim',
+    categoria: 'Porções / Acompanhamentos',
+    descricao: 'Batatas rústicas com casca bem douradas e crocantes, temperadas com sal marinho, páprica e alecrim. Acompanha molho da casa.',
+    tempoPreparoMinutos: 8,
+    ingredientes: [],
+    pesoCruTotal: 250,
+    fatorReducaoChapa: 10,
+    pesoGrelhado: 225,
+    rendimentoPorcoes: 1,
+    custoInsumos: 4.50,
+    custoEmbalagem: 1.50,
+    custoMaoDeObra: 1.50,
+    custoTotalProducao: 7.50,
+    margemLucroAlvo: 60,
+    impostosTaxas: 10,
+    precoVendaSugerido: 16.00,
+    precoVendaPraticado: 16.90,
+    cmvPercentual: 26.6,
+    modoPreparo: ['Fritar em óleo a 180°C até dourar', 'Secar e temperar com flor de sal e páprica', 'Servir com molho'],
+    imagemUrl: 'https://images.unsplash.com/photo-1573080496219-bb080dd4f877?w=600&auto=format&fit=crop&q=80',
+    destaque: false,
+    habilitarAdicionais: false,
+    habilitarRemocaoIngredientes: false,
+    perguntaSaches: true,
+    ativo: true
+  },
+  {
+    nome: 'Refrigerante Lata Gelada 350ml',
+    categoria: 'Bebidas',
+    descricao: 'Lata 350ml super gelada. Opções: Coca-Cola original, Coca-Cola Zero ou Guaraná Antarctica.',
+    tempoPreparoMinutos: 1,
+    ingredientes: [],
+    pesoCruTotal: 350,
+    fatorReducaoChapa: 0,
+    pesoGrelhado: 350,
+    rendimentoPorcoes: 1,
+    custoInsumos: 3.20,
+    custoEmbalagem: 0.30,
+    custoMaoDeObra: 0.50,
+    custoTotalProducao: 4.00,
+    margemLucroAlvo: 40,
+    impostosTaxas: 10,
+    precoVendaSugerido: 6.00,
+    precoVendaPraticado: 6.00,
+    cmvPercentual: 53.3,
+    modoPreparo: ['Retirar lata bem gelada da cervejeira/geladeira', 'Sanitizar lata e embalar'],
+    imagemUrl: 'https://images.unsplash.com/photo-1622483767028-3f66f32aef97?w=600&auto=format&fit=crop&q=80',
+    destaque: false,
+    habilitarAdicionais: false,
+    habilitarRemocaoIngredientes: false,
+    perguntaSaches: false,
+    ativo: true
+  }
+];
+
 interface BurgerContextType {
   insumos: Insumo[];
   fichasTecnicas: FichaTecnica[];
   ordensChapa: OrdemChapa[];
   userRole: UserRole;
   blendCalculator: BlendCalculatorState;
+  menuSettings: DigitalMenuSettings;
   
   // Handlers
   setUserRole: (role: UserRole) => void;
+  updateMenuSettings: (settings: Partial<DigitalMenuSettings>) => void;
   addInsumo: (insumo: Omit<Insumo, 'id' | 'ultimaAtualizacao' | 'custoUnitario'>) => void;
   updateInsumo: (id: string, insumo: Partial<Insumo>) => void;
   deleteInsumo: (id: string) => void;
@@ -567,7 +748,18 @@ interface BurgerContextType {
   deleteOrdemChapa: (id: string) => void;
 
   updateBlendCalculator: (blend: Partial<BlendCalculatorState>) => void;
+  importIFoodCatalog: (items: ParsedIFoodItem[]) => number;
+  resetToOfficialIFoodMenu: () => void;
   resetToDefaults: () => void;
+  clearAllMenuData: () => void;
+  loadNewCopyTemplate: () => void;
+  resetAllSettings: () => void;
+  quickUpdateItem: (id: string, updates: Partial<FichaTecnica>) => void;
+  duplicateItem: (id: string) => void;
+  clearAllPhotos: () => void;
+  simulateIFoodOrder: (custom?: Partial<OrdemChapa>) => OrdemChapa;
+  simulateDigitalMenuOrder: (custom?: Partial<OrdemChapa>) => OrdemChapa;
+  confirmPixPayment: (id: string, e2eId?: string) => void;
 }
 
 const BurgerContext = createContext<BurgerContextType | undefined>(undefined);
@@ -578,9 +770,40 @@ export const BurgerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     return local ? JSON.parse(local) : INITIAL_INSUMOS;
   });
 
+  const [menuSettings, setMenuSettings] = useState<DigitalMenuSettings>(() => {
+    const local = localStorage.getItem('taverna_menu_settings');
+    if (local) {
+      try {
+        const parsed = JSON.parse(local);
+        return {
+          ...DEFAULT_MENU_SETTINGS,
+          ...parsed,
+          pixNubank: {
+            ...DEFAULT_MENU_SETTINGS.pixNubank!,
+            ...(parsed.pixNubank || {})
+          }
+        };
+      } catch (e) {
+        console.error('Erro ao ler menu settings:', e);
+      }
+    }
+    return DEFAULT_MENU_SETTINGS;
+  });
+
   const [fichasTecnicas, setFichasTecnicas] = useState<FichaTecnica[]>(() => {
     const local = localStorage.getItem('taverna_fichas');
-    return local ? JSON.parse(local) : INITIAL_FICHAS;
+    if (local !== null) {
+      try {
+        const parsed = JSON.parse(local);
+        if (Array.isArray(parsed)) {
+          return parsed as FichaTecnica[];
+        }
+      } catch (e) {
+        console.error('Erro ao ler fichas salvas:', e);
+      }
+    }
+    const officialFichas = TAVERNA_IFOOD_CATALOG.map((item, idx) => convertParsedItemToFicha(item, idx));
+    return officialFichas;
   });
 
   const [ordensChapa, setOrdensChapa] = useState<OrdemChapa[]>(() => {
@@ -597,6 +820,10 @@ export const BurgerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     const local = localStorage.getItem('taverna_blend');
     return local ? JSON.parse(local) : INITIAL_BLEND_CALCULATOR;
   });
+
+  useEffect(() => {
+    localStorage.setItem('taverna_menu_settings', JSON.stringify(menuSettings));
+  }, [menuSettings]);
 
   useEffect(() => {
     localStorage.setItem('taverna_insumos', JSON.stringify(insumos));
@@ -689,6 +916,22 @@ export const BurgerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     setOrdensChapa(prev => prev.map(ord => ord.id === id ? { ...ord, status } : ord));
   };
 
+  const confirmPixPayment = (id: string, e2eId?: string) => {
+    const confirmationTime = new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+    const generatedE2e = e2eId || `E18236120${Date.now()}`;
+    setOrdensChapa(prev => prev.map(ord => {
+      if (ord.id === id) {
+        return {
+          ...ord,
+          pixStatus: 'confirmado' as const,
+          pixDataConfirmacao: confirmationTime,
+          pixE2eId: generatedE2e
+        };
+      }
+      return ord;
+    }));
+  };
+
   const deleteOrdemChapa = (id: string) => {
     setOrdensChapa(prev => prev.filter(ord => ord.id !== id));
   };
@@ -697,12 +940,275 @@ export const BurgerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     setBlendCalculator(prev => ({ ...prev, ...data }));
   };
 
+  const updateMenuSettings = (settings: Partial<DigitalMenuSettings>) => {
+    setMenuSettings(prev => ({ ...prev, ...settings }));
+  };
+
+  const importIFoodCatalog = (items: ParsedIFoodItem[]) => {
+    let count = 0;
+    setFichasTecnicas(prev => {
+      const updated = [...prev];
+      items.forEach((item, idx) => {
+        const existingIdx = updated.findIndex(f => f.nome.toLowerCase() === item.nome.toLowerCase());
+        const newFicha = convertParsedItemToFicha(item, updated.length + idx);
+        if (existingIdx >= 0) {
+          updated[existingIdx] = {
+            ...updated[existingIdx],
+            precoVendaPraticado: item.precoVenda,
+            precoOriginal: item.precoOriginal,
+            descricao: item.descricao || updated[existingIdx].descricao,
+            destaque: item.destaque,
+            ifoodCategory: item.categoriaOrigem
+          };
+        } else {
+          updated.unshift(newFicha);
+        }
+        count++;
+      });
+      return updated;
+    });
+    return count;
+  };
+
+  const resetToOfficialIFoodMenu = () => {
+    const officialFichas = TAVERNA_IFOOD_CATALOG.map((item, idx) => convertParsedItemToFicha(item, idx));
+    setFichasTecnicas(officialFichas);
+    localStorage.setItem('taverna_fichas', JSON.stringify(officialFichas));
+  };
+
+  const clearAllMenuData = () => {
+    setFichasTecnicas([]);
+    localStorage.setItem('taverna_fichas', JSON.stringify([]));
+  };
+
+  const loadNewCopyTemplate = () => {
+    const today = new Date().toISOString().split('T')[0];
+    const newItems: FichaTecnica[] = BLANK_COPY_TEMPLATE.map((tpl, i) => ({
+      ...tpl,
+      id: `copy-item-${Date.now()}-${i}`,
+      dataCriacao: today
+    }));
+    setFichasTecnicas(newItems);
+    localStorage.setItem('taverna_fichas', JSON.stringify(newItems));
+  };
+
+  const resetAllSettings = () => {
+    setMenuSettings(DEFAULT_MENU_SETTINGS);
+    localStorage.setItem('taverna_menu_settings', JSON.stringify(DEFAULT_MENU_SETTINGS));
+  };
+
+  const quickUpdateItem = (id: string, updates: Partial<FichaTecnica>) => {
+    setFichasTecnicas(prev => {
+      const next = prev.map(item => item.id === id ? { ...item, ...updates } : item);
+      localStorage.setItem('taverna_fichas', JSON.stringify(next));
+      return next;
+    });
+  };
+
+  const duplicateItem = (id: string) => {
+    const existing = fichasTecnicas.find(f => f.id === id);
+    if (!existing) return;
+    const duplicated: FichaTecnica = {
+      ...existing,
+      id: `copy-${Date.now()}`,
+      nome: `${existing.nome} (Cópia)`,
+      dataCriacao: new Date().toISOString().split('T')[0]
+    };
+    const next = [duplicated, ...fichasTecnicas];
+    setFichasTecnicas(next);
+    localStorage.setItem('taverna_fichas', JSON.stringify(next));
+  };
+
   const resetToDefaults = () => {
+    const officialFichas = TAVERNA_IFOOD_CATALOG.map((item, idx) => convertParsedItemToFicha(item, idx));
     setInsumos(INITIAL_INSUMOS);
-    setFichasTecnicas(INITIAL_FICHAS);
+    setFichasTecnicas(officialFichas);
     setOrdensChapa(INITIAL_ORDENS);
     setBlendCalculator(INITIAL_BLEND_CALCULATOR);
+    setMenuSettings(DEFAULT_MENU_SETTINGS);
     setUserRole('Chapeiro / Grelhador');
+    localStorage.setItem('taverna_insumos', JSON.stringify(INITIAL_INSUMOS));
+    localStorage.setItem('taverna_fichas', JSON.stringify(officialFichas));
+    localStorage.setItem('taverna_ordens', JSON.stringify(INITIAL_ORDENS));
+    localStorage.setItem('taverna_menu_settings', JSON.stringify(DEFAULT_MENU_SETTINGS));
+  };
+
+  const clearAllPhotos = () => {
+    setFichasTecnicas(prev => {
+      const updated = prev.map(f => ({ ...f, imagemUrl: undefined }));
+      localStorage.setItem('taverna_fichas', JSON.stringify(updated));
+      return updated;
+    });
+  };
+
+  const simulateIFoodOrder = (custom?: Partial<OrdemChapa>): OrdemChapa => {
+    const now = new Date();
+    const hora = now.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+    const ifoodNumber = Math.floor(1000 + Math.random() * 9000);
+    const orderId = `ord-ifood-${Date.now().toString().slice(-5)}`;
+
+    const burgerItem = fichasTecnicas.find(f => f.categoria === 'Smash Burgers' || f.categoria === 'Clássicos') || fichasTecnicas[0];
+    const sideItem = fichasTecnicas.find(f => f.categoria === 'Porções / Acompanhamentos');
+    const drinkItem = fichasTecnicas.find(f => f.categoria === 'Bebidas');
+
+    const itens: ItemPedidoChapa[] = [];
+    if (burgerItem) {
+      itens.push({
+        fichaTecnicaId: burgerItem.id,
+        nomeItem: burgerItem.nome,
+        quantidade: 1,
+        precoUnitario: burgerItem.precoVendaPraticado,
+        pontoCarne: burgerItem.pontoCarneRecomendado || 'Smash Crocante',
+        adicionais: ['Bacon Extra Crocante (+R$ 5,00)'],
+        remocoes: ['Sem Cebola'],
+        querSaches: true,
+        observacoes: 'Borda bem tostada na chapa e caprichar no molho da casa'
+      });
+    } else {
+      itens.push({
+        fichaTecnicaId: 'ft-sim-1',
+        nomeItem: 'O Ogro | Smash Triplo Burguer',
+        quantidade: 1,
+        precoUnitario: 44.90,
+        pontoCarne: 'Smash Crocante',
+        adicionais: ['Bacon Extra'],
+        remocoes: ['Sem Cebola'],
+        querSaches: true,
+        observacoes: 'Padrão especial da guilda'
+      });
+    }
+
+    if (sideItem) {
+      itens.push({
+        fichaTecnicaId: sideItem.id,
+        nomeItem: sideItem.nome,
+        quantidade: 1,
+        precoUnitario: sideItem.precoVendaPraticado,
+        querSaches: true
+      });
+    }
+
+    if (drinkItem) {
+      itens.push({
+        fichaTecnicaId: drinkItem.id,
+        nomeItem: drinkItem.nome,
+        quantidade: 1,
+        precoUnitario: drinkItem.precoVendaPraticado
+      });
+    }
+
+    const subtotal = itens.reduce((sum, it) => sum + ((it.precoUnitario || 35) * it.quantidade), 0) + 5;
+    const taxa = menuSettings.taxaEntregaPadrao || 5.00;
+    const valorTotal = Number((subtotal + taxa).toFixed(2));
+
+    const names = ['Mariana Silva (iFood)', 'Lucas Rocha (iFood)', 'Camila Andrade (iFood)', 'Felipe Albuquerque (iFood)'];
+    const randomName = names[Math.floor(Math.random() * names.length)];
+    const addresses = [
+      'Av. Jorge Teixeira, 1420 - Apto 302, Bairro Liberdade',
+      'Rua Duque de Caxias, 850 - Caiari',
+      'Av. Sete de Setembro, 2100 - Centro',
+      'Rua Guanabara, 455 - Embratel'
+    ];
+    const randomAddr = addresses[Math.floor(Math.random() * addresses.length)];
+
+    const novaOrdem: OrdemChapa = {
+      id: orderId,
+      numeroMesaComanda: `iFood #${ifoodNumber}`,
+      clienteNome: randomName,
+      clienteTelefone: `(69) 99${Math.floor(100 + Math.random() * 900)}-${Math.floor(1000 + Math.random() * 9000)}`,
+      enderecoEntrega: randomAddr,
+      formaPagamento: 'pix',
+      valorTotal,
+      tipo: 'delivery',
+      status: 'na_fila',
+      horaEntrada: hora,
+      temperaturaChapa: 230,
+      chapeiroResponsavel: userRole,
+      prioridade: 'alta',
+      origem: 'ifood',
+      precisaSaches: true,
+      precisaGuardanapos: true,
+      itens,
+      ...custom
+    };
+
+    setOrdensChapa(prev => [novaOrdem, ...prev]);
+
+    try {
+      printOrdemChapaThermal(novaOrdem);
+    } catch (e) {
+      console.log('Thermal print simulated');
+    }
+
+    return novaOrdem;
+  };
+
+  const simulateDigitalMenuOrder = (custom?: Partial<OrdemChapa>): OrdemChapa => {
+    const now = new Date();
+    const hora = now.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+    const comandaNum = Math.floor(100 + Math.random() * 900);
+    const orderId = `ord-cardapio-${Date.now().toString().slice(-5)}`;
+
+    const burgerItem = fichasTecnicas.find(f => f.categoria === 'Smash Burgers' || f.categoria === 'Clássicos') || fichasTecnicas[0];
+    const sideItem = fichasTecnicas.find(f => f.categoria === 'Porções / Acompanhamentos');
+
+    const itens: ItemPedidoChapa[] = [
+      {
+        fichaTecnicaId: burgerItem ? burgerItem.id : 'ft-1',
+        nomeItem: burgerItem ? burgerItem.nome : 'Burger Artesanal Especial',
+        quantidade: 1,
+        precoUnitario: burgerItem ? burgerItem.precoVendaPraticado : 32.90,
+        pontoCarne: burgerItem?.pontoCarneRecomendado || 'Smash Crocante',
+        adicionais: ['Queijo Cheddar Duplo (+R$ 4,00)'],
+        remocoes: [],
+        querSaches: true
+      }
+    ];
+
+    if (sideItem) {
+      itens.push({
+        fichaTecnicaId: sideItem.id,
+        nomeItem: sideItem.nome,
+        quantidade: 1,
+        precoUnitario: sideItem.precoVendaPraticado,
+        querSaches: false
+      });
+    }
+
+    const subtotal = itens.reduce((sum, it) => sum + ((it.precoUnitario || 30) * it.quantidade), 0) + 4;
+    const taxa = menuSettings.taxaEntregaPadrao || 5.00;
+    const valorTotal = Number((subtotal + taxa).toFixed(2));
+
+    const novaOrdem: OrdemChapa = {
+      id: orderId,
+      numeroMesaComanda: `Delivery #WEB-${comandaNum}`,
+      clienteNome: 'Cliente do Cardápio Digital',
+      clienteTelefone: '(69) 99888-7766',
+      enderecoEntrega: 'Av. Pinheiro Machado, 920 - São Cristóvão',
+      formaPagamento: 'pix',
+      valorTotal,
+      tipo: 'delivery',
+      status: 'na_fila',
+      horaEntrada: hora,
+      temperaturaChapa: 230,
+      chapeiroResponsavel: userRole,
+      prioridade: 'normal',
+      origem: 'cardapio_digital',
+      precisaSaches: true,
+      precisaGuardanapos: true,
+      itens,
+      ...custom
+    };
+
+    setOrdensChapa(prev => [novaOrdem, ...prev]);
+
+    try {
+      printOrdemChapaThermal(novaOrdem);
+    } catch (e) {
+      console.log('Thermal print simulated');
+    }
+
+    return novaOrdem;
   };
 
   return (
@@ -712,7 +1218,9 @@ export const BurgerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       ordensChapa,
       userRole,
       blendCalculator,
+      menuSettings,
       setUserRole,
+      updateMenuSettings,
       addInsumo,
       updateInsumo,
       deleteInsumo,
@@ -724,7 +1232,18 @@ export const BurgerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       updateStatusOrdemChapa,
       deleteOrdemChapa,
       updateBlendCalculator,
-      resetToDefaults
+      importIFoodCatalog,
+      resetToOfficialIFoodMenu,
+      resetToDefaults,
+      clearAllMenuData,
+      loadNewCopyTemplate,
+      resetAllSettings,
+      quickUpdateItem,
+      duplicateItem,
+      clearAllPhotos,
+      simulateIFoodOrder,
+      simulateDigitalMenuOrder,
+      confirmPixPayment
     }}>
       {children}
     </BurgerContext.Provider>
