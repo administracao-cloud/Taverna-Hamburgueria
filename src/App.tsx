@@ -15,7 +15,6 @@ import { TechnicalSheetModal } from './components/modals/TechnicalSheetModal';
 import { MaterialModal } from './components/modals/MaterialModal';
 import { NewChapaOrderModal } from './components/modals/NewChapaOrderModal';
 import { Insumo, FichaTecnica } from './types';
-import { Flame, Shield, LogIn } from 'lucide-react';
 
 export function TavernaApp() {
   const { isAuthenticated, currentUser } = useBurger();
@@ -74,41 +73,10 @@ export function TavernaApp() {
   };
 
   // 1. Standalone Customer Menu View (accessed by QR Code, customer URL, or test shortcut)
+  // Strictly isolated: no buttons or navigation links to the administration panel or login
   if (isStandaloneMenu) {
     return (
       <div className="min-h-screen bg-stone-950 text-stone-100 flex flex-col">
-        {/* Subtle top bar */}
-        <div className="bg-stone-900/90 border-b border-stone-800 px-4 py-2 flex items-center justify-between text-xs backdrop-blur-md sticky top-0 z-50">
-          <div className="flex items-center gap-2 text-stone-300">
-            <Flame className="w-4 h-4 text-amber-500 fill-amber-500" />
-            <span className="font-bold text-stone-100 font-display">Taverna</span>
-            <span className="text-stone-500">•</span>
-            <span className="text-stone-400">Cardápio Digital Oficial</span>
-          </div>
-
-          <button
-            onClick={() => {
-              setIsStandaloneMenu(false);
-              if (window.history.pushState) {
-                window.history.pushState(null, '', window.location.pathname);
-              }
-            }}
-            className="flex items-center gap-1.5 px-3 py-1 bg-stone-800 hover:bg-stone-700 text-stone-300 hover:text-white rounded-lg transition-colors font-medium text-[11px]"
-          >
-            {isAuthenticated ? (
-              <>
-                <Shield className="w-3.5 h-3.5 text-amber-500" />
-                <span>Painel da Hamburgueria</span>
-              </>
-            ) : (
-              <>
-                <LogIn className="w-3.5 h-3.5 text-amber-500" />
-                <span>Área da Equipe / Login</span>
-              </>
-            )}
-          </button>
-        </div>
-
         <div className="flex-1">
           <CustomerMenu />
         </div>

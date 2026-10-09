@@ -114,7 +114,7 @@ export const CustomerMenu: React.FC = () => {
   const [trocoPara, setTrocoPara] = useState('');
   const [thermalFormat, setThermalFormat] = useState<ThermalPaperFormat>('58mm');
 
-  // Sachês & Descartáveis (iFood Style)
+  // Sachês & Descartáveis
   const [desejaSaches, setDesejaSaches] = useState<boolean>(true);
   const [desejaGuardanapos, setDesejaGuardanapos] = useState<boolean>(true);
 
@@ -164,7 +164,7 @@ export const CustomerMenu: React.FC = () => {
     }
   }, [menuSettings.permitirSalao]);
 
-  // Categories list matching iFood categories
+  // Categories list
   const categoryFilters = [
     { id: 'Todos', label: 'Todos os Itens' },
     { id: 'Destaques', label: '🔥 Destaques da Taverna' },
@@ -987,7 +987,7 @@ export const CustomerMenu: React.FC = () => {
                 <div className="flex items-center justify-between text-xs">
                   <span className="font-extrabold text-stone-200 flex items-center gap-1.5">
                     <PackageCheck className="w-4 h-4 text-amber-500" />
-                    <span>Pergunta de Sachês (Estilo iFood)</span>
+                    <span>Sachês e Condimentos</span>
                   </span>
                   <span className="text-[10px] text-emerald-400 font-semibold">🌱 Consumo Consciente</span>
                 </div>
@@ -1178,7 +1178,7 @@ export const CustomerMenu: React.FC = () => {
                 </div>
               </div>
 
-              {/* PERGUNTA DE DESCARTÁVEIS & SACHÊS (Estilo iFood configurável pelo admin) */}
+              {/* PERGUNTA DE DESCARTÁVEIS & SACHÊS (Configurável pelo admin) */}
               {(menuSettings.habilitarPerguntaSaches || menuSettings.habilitarPerguntaGuardanapos) && (
                 <div className="p-4 bg-stone-950 rounded-2xl border border-stone-800 space-y-3">
                   <div className="flex items-center justify-between text-xs">
