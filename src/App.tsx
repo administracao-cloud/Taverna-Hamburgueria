@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { BurgerProvider } from './context/BakeryContext';
+import { BurgerProvider, useBurger } from './context/BakeryContext';
 import { Header } from './components/Header';
 import { Sidebar, ActiveTab } from './components/Sidebar';
 import { OverviewView } from './components/views/OverviewView';
@@ -10,13 +10,15 @@ import { BlendCalculatorView } from './components/views/BlendCalculatorView';
 import { FinancialSimView } from './components/views/FinancialSimView';
 import { DigitalMenuView } from './components/views/DigitalMenuView';
 import { CustomerMenu } from './components/menu/CustomerMenu';
+import { LoginView } from './components/auth/LoginView';
 import { TechnicalSheetModal } from './components/modals/TechnicalSheetModal';
 import { MaterialModal } from './components/modals/MaterialModal';
 import { NewChapaOrderModal } from './components/modals/NewChapaOrderModal';
 import { Insumo, FichaTecnica } from './types';
-import { Flame, ArrowLeft, Shield } from 'lucide-react';
+import { Flame, Shield, LogIn } from 'lucide-react';
 
 export function TavernaApp() {
+  const { isAuthenticated, currentUser } = useBurger();
   const [activeTab, setActiveTab] = useState<ActiveTab>('dashboard');
   
   // Standalone customer menu mode (e.g. for customers scanning QR code)
@@ -71,7 +73,7 @@ export function TavernaApp() {
     setIsMaterialModalOpen(true);
   };
 
-  // Standalone Customer Menu View (accessed by QR Code or customer URL)
+  // 1. Standalone Customer Menu View (accessed by QR Code, customer URL, or test shortcut)
   if (isStandaloneMenu) {
     return (
       <div className="min-h-screen bg-stone-950 text-stone-100 flex flex-col">
@@ -93,8 +95,17 @@ export function TavernaApp() {
             }}
             className="flex items-center gap-1.5 px-3 py-1 bg-stone-800 hover:bg-stone-700 text-stone-300 hover:text-white rounded-lg transition-colors font-medium text-[11px]"
           >
-            <Shield className="w-3.5 h-3.5 text-amber-500" />
-            <span>Painel da Hamburgueria</span>
+            {isAuthenticated ? (
+              <>
+                <Shield className="w-3.5 h-3.5 text-amber-500" />
+                <span>Painel da Hamburgueria</span>
+              </>
+            ) : (
+              <>
+                <LogIn className="w-3.5 h-3.5 text-amber-500" />
+                <span>Área da Equipe / Login</span>
+              </>
+            )}
           </button>
         </div>
 
@@ -105,6 +116,16 @@ export function TavernaApp() {
     );
   }
 
+  // 2. Authentication Gate: If not authenticated, show the Login View
+  if (!isAuthenticated) {
+    return (
+      <LoginView 
+        onOpenCustomerMenu={() => setIsStandaloneMenu(true)} 
+      />
+    );
+  }
+
+  // 3. Authenticated Internal Management Panel
   return (
     <div className="flex h-screen bg-stone-950 text-stone-100 overflow-hidden select-none">
       {/* Sidebar navigation */}
@@ -115,6 +136,7 @@ export function TavernaApp() {
         <Header 
           onOpenNewOrder={() => setIsOrderModalOpen(true)}
           onOpenNewFicha={handleOpenNewFicha}
+          onOpenCustomerMenu={() => setIsStandaloneMenu(true)}
         />
 
         <main className="flex-1 overflow-y-auto bg-stone-950">

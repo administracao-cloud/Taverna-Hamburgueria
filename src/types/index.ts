@@ -186,3 +186,14 @@ export type UserRole =
   | 'Chapeiro Chefe'
   | 'Gerente de Operações'
   | 'Administrador';
+
+export interface UserAccount {
+  id: string;
+  name: string;
+  email: string;
+  password: string;
+  role: UserRole;
+  avatar?: string;
+  telefone?: string;
+  createdAt?: string;
+}

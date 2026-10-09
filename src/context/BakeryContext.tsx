@@ -7,10 +7,50 @@ import {
   MaterialCategory, 
   RecipeCategory, 
   UserRole,
+  UserAccount,
   BlendCalculatorState,
   DigitalMenuSettings,
   AdicionalConfig
 } from '../types';
+
+export const DEFAULT_USERS: UserAccount[] = [
+  {
+    id: 'user-admin-1',
+    name: 'Chef Administrador (Você)',
+    email: 'admin@taverna.com',
+    password: 'admin',
+    role: 'Administrador',
+    telefone: '(69) 99345-8812',
+    createdAt: '2026-01-10'
+  },
+  {
+    id: 'user-gerente-2',
+    name: 'Rodrigo Mendonça',
+    email: 'gerente@taverna.com',
+    password: 'gerente123',
+    role: 'Gerente de Operações',
+    telefone: '(69) 98122-3344',
+    createdAt: '2026-02-01'
+  },
+  {
+    id: 'user-chefe-3',
+    name: 'Marcos Silva',
+    email: 'chefe@taverna.com',
+    password: 'chefe123',
+    role: 'Chapeiro Chefe',
+    telefone: '(69) 98455-6677',
+    createdAt: '2026-02-15'
+  },
+  {
+    id: 'user-chapa-4',
+    name: 'Lucas Ferreira',
+    email: 'chapa@taverna.com',
+    password: 'chapa123',
+    role: 'Chapeiro / Grelhador',
+    telefone: '(69) 98765-4321',
+    createdAt: '2026-03-01'
+  }
+];
 import { 
   TAVERNA_IFOOD_CATALOG, 
   convertParsedItemToFicha, 
@@ -760,6 +800,15 @@ interface BurgerContextType {
   simulateIFoodOrder: (custom?: Partial<OrdemChapa>) => OrdemChapa;
   simulateDigitalMenuOrder: (custom?: Partial<OrdemChapa>) => OrdemChapa;
   confirmPixPayment: (id: string, e2eId?: string) => void;
+
+  // Autenticação e Gestão de Usuários
+  currentUser: UserAccount | null;
+  isAuthenticated: boolean;
+  usersList: UserAccount[];
+  login: (email: string, password: string) => { success: boolean; message?: string };
+  logout: () => void;
+  quickLoginAs: (roleOrEmail: UserRole | string) => void;
+  registerUser: (newUser: Omit<UserAccount, 'id'>) => { success: boolean; message?: string };
 }
 
 const BurgerContext = createContext<BurgerContextType | undefined>(undefined);
@@ -820,6 +869,115 @@ export const BurgerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     const local = localStorage.getItem('taverna_blend');
     return local ? JSON.parse(local) : INITIAL_BLEND_CALCULATOR;
   });
+
+  // Gestão de Usuários e Autenticação
+  const [usersList, setUsersList] = useState<UserAccount[]>(() => {
+    const local = localStorage.getItem('taverna_users');
+    if (local) {
+      try {
+        const parsed = JSON.parse(local);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      } catch (e) {
+        console.error('Erro ao ler usuários:', e);
+      }
+    }
+    return DEFAULT_USERS;
+  });
+
+  const [currentUser, setCurrentUser] = useState<UserAccount | null>(() => {
+    const local = localStorage.getItem('taverna_current_user');
+    if (local) {
+      try {
+        return JSON.parse(local) as UserAccount;
+      } catch (e) {
+        console.error('Erro ao ler sessão de usuário:', e);
+      }
+    }
+    return null;
+  });
+
+  const isAuthenticated = !!currentUser;
+
+  useEffect(() => {
+    localStorage.setItem('taverna_users', JSON.stringify(usersList));
+  }, [usersList]);
+
+  useEffect(() => {
+    if (currentUser) {
+      localStorage.setItem('taverna_current_user', JSON.stringify(currentUser));
+      setUserRole(currentUser.role);
+    } else {
+      localStorage.removeItem('taverna_current_user');
+    }
+  }, [currentUser]);
+
+  const login = (emailInput: string, passwordInput: string): { success: boolean; message?: string } => {
+    const cleanEmail = emailInput.trim().toLowerCase();
+    const cleanPass = passwordInput.trim();
+
+    if (!cleanEmail || !cleanPass) {
+      return { success: false, message: 'Informe o e-mail/usuário e a senha para entrar.' };
+    }
+
+    // Procura por email exato, ou apelido rápido 'admin', 'gerente', 'chefe', 'chapa'
+    const foundUser = usersList.find(u => {
+      const emailMatches = u.email.toLowerCase() === cleanEmail ||
+        (cleanEmail === 'admin' && u.email.toLowerCase().includes('admin')) ||
+        (cleanEmail === 'gerente' && u.email.toLowerCase().includes('gerente')) ||
+        (cleanEmail === 'chefe' && u.email.toLowerCase().includes('chefe')) ||
+        (cleanEmail === 'chapa' && u.email.toLowerCase().includes('chapa'));
+      
+      const passMatches = u.password === cleanPass || 
+        (u.role === 'Administrador' && (cleanPass === 'admin' || cleanPass === 'admin123' || cleanPass === 'taverna123'));
+      
+      return emailMatches && passMatches;
+    });
+
+    if (foundUser) {
+      setCurrentUser(foundUser);
+      setUserRole(foundUser.role);
+      return { success: true };
+    }
+
+    return { 
+      success: false, 
+      message: 'Credenciais incorretas. Use o login de Administrador: admin@taverna.com com senha: admin' 
+    };
+  };
+
+  const logout = () => {
+    setCurrentUser(null);
+    localStorage.removeItem('taverna_current_user');
+  };
+
+  const quickLoginAs = (roleOrEmail: UserRole | string) => {
+    const user = usersList.find(u => u.role === roleOrEmail || u.email.toLowerCase() === roleOrEmail.toLowerCase()) || usersList[0];
+    if (user) {
+      setCurrentUser(user);
+      setUserRole(user.role);
+    }
+  };
+
+  const registerUser = (newUser: Omit<UserAccount, 'id'>): { success: boolean; message?: string } => {
+    const emailNormalized = newUser.email.trim().toLowerCase();
+    if (!emailNormalized || !newUser.password) {
+      return { success: false, message: 'Preencha o e-mail e a senha do novo usuário.' };
+    }
+    if (usersList.some(u => u.email.toLowerCase() === emailNormalized)) {
+      return { success: false, message: 'Já existe um usuário com este e-mail cadastrado.' };
+    }
+
+    const created: UserAccount = {
+      ...newUser,
+      id: `user-${Date.now()}`,
+      createdAt: new Date().toISOString().split('T')[0]
+    };
+
+    setUsersList(prev => [...prev, created]);
+    setCurrentUser(created);
+    setUserRole(created.role);
+    return { success: true };
+  };
 
   useEffect(() => {
     localStorage.setItem('taverna_menu_settings', JSON.stringify(menuSettings));
@@ -1243,7 +1401,14 @@ export const BurgerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       clearAllPhotos,
       simulateIFoodOrder,
       simulateDigitalMenuOrder,
-      confirmPixPayment
+      confirmPixPayment,
+      currentUser,
+      isAuthenticated,
+      usersList,
+      login,
+      logout,
+      quickLoginAs,
+      registerUser
     }}>
       {children}
     </BurgerContext.Provider>

@@ -1,15 +1,16 @@
 import React from 'react';
 import { useBurger } from '../context/BakeryContext';
 import { UserRole } from '../types';
-import { Flame, Plus, Bell, ChefHat, RefreshCw, Layers } from 'lucide-react';
+import { Flame, Plus, ChefHat, RefreshCw, Layers, LogOut, User, UtensilsCrossed } from 'lucide-react';
 
 interface HeaderProps {
   onOpenNewOrder: () => void;
   onOpenNewFicha: () => void;
+  onOpenCustomerMenu?: () => void;
 }
 
-export const Header: React.FC<HeaderProps> = ({ onOpenNewOrder, onOpenNewFicha }) => {
-  const { userRole, setUserRole, ordensChapa, fichasTecnicas, resetToDefaults } = useBurger();
+export const Header: React.FC<HeaderProps> = ({ onOpenNewOrder, onOpenNewFicha, onOpenCustomerMenu }) => {
+  const { userRole, setUserRole, ordensChapa, fichasTecnicas, resetToDefaults, currentUser, logout } = useBurger();
 
   const ordensAtivas = ordensChapa.filter(o => o.status === 'na_chapa' || o.status === 'na_fila').length;
   const cmvMedio = (
@@ -63,22 +64,40 @@ export const Header: React.FC<HeaderProps> = ({ onOpenNewOrder, onOpenNewFicha }
       </div>
 
       {/* Zone 3: Role selector & primary actions */}
-      <div className="flex items-center gap-3">
-        {/* Role Selector */}
+      <div className="flex items-center gap-2.5">
+        {/* Role Selector & User Info */}
         <div className="flex items-center gap-2 bg-stone-950/80 border border-stone-800 rounded-lg px-2.5 py-1.5 text-xs text-stone-300">
           <ChefHat className="w-3.5 h-3.5 text-amber-500" />
-          <select 
-            value={userRole} 
-            onChange={(e) => setUserRole(e.target.value as UserRole)}
-            className="bg-transparent text-stone-200 font-medium focus:outline-none cursor-pointer"
-          >
-            {roles.map((r) => (
-              <option key={r} value={r} className="bg-stone-900 text-stone-100">
-                {r}
-              </option>
-            ))}
-          </select>
+          <div className="flex flex-col">
+            <span className="text-[10px] text-stone-300 font-medium leading-none">
+              {currentUser?.name ? currentUser.name.split(' ')[0] : 'Operador'}
+            </span>
+            <select 
+              value={userRole} 
+              onChange={(e) => setUserRole(e.target.value as UserRole)}
+              className="bg-transparent text-stone-200 font-bold focus:outline-none cursor-pointer text-xs"
+              title="Trocar permissão de operação"
+            >
+              {roles.map((r) => (
+                <option key={r} value={r} className="bg-stone-900 text-stone-100">
+                  {r}
+                </option>
+              ))}
+            </select>
+          </div>
         </div>
+
+        {/* Public Customer Menu Shortcut */}
+        {onOpenCustomerMenu && (
+          <button
+            onClick={onOpenCustomerMenu}
+            className="hidden lg:inline-flex items-center gap-1 px-2.5 py-1.5 text-xs font-medium text-stone-300 bg-stone-800/80 hover:bg-stone-700 hover:text-white rounded-lg transition-colors border border-stone-700"
+            title="Abrir Cardápio Público do Cliente"
+          >
+            <UtensilsCrossed className="w-3.5 h-3.5 text-amber-500" />
+            <span>Cardápio Cliente</span>
+          </button>
+        )}
 
         {/* Quick action: Nova Ficha Técnica */}
         <button
@@ -106,6 +125,16 @@ export const Header: React.FC<HeaderProps> = ({ onOpenNewOrder, onOpenNewFicha }
           className="p-1.5 text-stone-500 hover:text-stone-300 transition-colors rounded-md hover:bg-stone-800"
         >
           <RefreshCw className="w-3.5 h-3.5" />
+        </button>
+
+        {/* Logout Button */}
+        <button
+          onClick={logout}
+          title="Encerrar sessão (Logout)"
+          className="flex items-center gap-1 px-2 py-1.5 text-xs font-medium text-rose-400 hover:text-rose-200 bg-rose-950/40 hover:bg-rose-900/50 border border-rose-900/60 rounded-lg transition-colors"
+        >
+          <LogOut className="w-3.5 h-3.5" />
+          <span className="hidden sm:inline">Sair</span>
         </button>
       </div>
     </header>

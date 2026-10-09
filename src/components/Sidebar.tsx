@@ -8,7 +8,9 @@ import {
   TrendingUp, 
   Sparkles,
   ShieldCheck,
-  Layers
+  Layers,
+  LogOut,
+  UserCheck
 } from 'lucide-react';
 import { useBurger } from '../context/BakeryContext';
 
@@ -27,7 +29,7 @@ interface SidebarProps {
 }
 
 export const Sidebar: React.FC<SidebarProps> = ({ activeTab, onSelectTab }) => {
-  const { ordensChapa, insumos } = useBurger();
+  const { ordensChapa, insumos, currentUser, userRole, logout } = useBurger();
 
   const ordensAtivasCount = ordensChapa.filter(o => o.status !== 'pronto').length;
   const insumosBaixosCount = insumos.filter(i => i.estoqueAtual <= i.estoqueMinimo).length;
@@ -114,21 +116,38 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeTab, onSelectTab }) => {
         })}
       </div>
 
-      {/* Footer strictly updated with artisanal burger terms */}
-      <div className="p-4 m-3 rounded-xl bg-stone-950/70 border border-stone-800/80">
-        <div className="flex items-center gap-2 mb-2">
-          <div className="w-2 h-2 rounded-full bg-amber-500 animate-pulse" />
-          <span className="text-xs font-bold text-stone-200">Hambúrgueres na Brasa</span>
+      {/* User profile card & Logout */}
+      <div className="p-3 m-3 rounded-xl bg-stone-950/90 border border-stone-800 space-y-2.5">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2 min-w-0">
+            <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-amber-500 to-orange-600 text-stone-950 flex items-center justify-center font-bold text-xs shrink-0 shadow-sm">
+              {currentUser?.name ? currentUser.name.slice(0, 2).toUpperCase() : 'TA'}
+            </div>
+            <div className="min-w-0">
+              <span className="text-xs font-bold text-stone-100 truncate block">
+                {currentUser?.name || 'Administrador'}
+              </span>
+              <span className="text-[10px] text-amber-400 font-medium truncate block">
+                {userRole}
+              </span>
+            </div>
+          </div>
+
+          <button
+            onClick={logout}
+            title="Sair do Sistema"
+            className="p-1.5 text-stone-500 hover:text-rose-400 hover:bg-stone-900 rounded-lg transition-colors shrink-0"
+          >
+            <LogOut className="w-4 h-4" />
+          </button>
         </div>
-        <p className="text-[11px] text-stone-300 leading-relaxed">
-          Blends artesanais diários, cortes nobres frescos e padronização técnica de grelha.
-        </p>
-        <div className="mt-3 pt-2.5 border-t border-stone-800/60 flex items-center justify-between text-[10px] text-stone-400">
+
+        <div className="pt-2 border-t border-stone-800/80 flex items-center justify-between text-[10px] text-stone-400">
           <span className="flex items-center gap-1">
             <ShieldCheck className="w-3 h-3 text-emerald-500" />
-            Fogo & Lenha 100%
+            Conexão Segura
           </span>
-          <span className="font-mono">v2.4</span>
+          <span className="font-mono text-stone-300">v2.4</span>
         </div>
       </div>
     </aside>
